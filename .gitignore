@@ -1,0 +1,81 @@
+Skip to content
+Search or jump to…
+Pull requests
+Issues
+Marketplace
+Explore
+ 
+@panmusk 
+dotnet
+/
+core
+Public
+Code
+Issues
+418
+Pull requests
+12
+Actions
+Projects
+Security
+Insights
+core/.gitignore
+@pavinthan
+pavinthan Add jetbrains folder to .gitignore (#2320)
+Latest commit 718ec99 on Feb 27, 2019
+ History
+ 5 contributors
+@richlander@geek@Petermarcu@pavinthan@terrajobst
+37 lines (32 sloc)  341 Bytes
+
+*.swp
+*.*~
+project.lock.json
+.DS_Store
+*.pyc
+nupkg/
+
+# Visual Studio Code
+.vscode
+
+# Rider
+.idea
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# Visual Studio 2015
+.vs/
+Footer
+© 2022 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
+Docs
+Contact GitHub
+Pricing
+API
+Training
+Blog
+About
