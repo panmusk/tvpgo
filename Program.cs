@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Diagnostics;
+using System.Text;
 using Newtonsoft.Json;
 using CommandLine;
 using tvpgo.Json;
@@ -16,6 +17,8 @@ namespace tvpgo
         public bool Epg { get; set; }
         [Option('r', Required = false)]
         public string ReocordId { get; set; }
+        [Option('p', Required = false)]
+        public bool Play { get; set; }
     }
     internal class Program
     {
@@ -27,16 +30,18 @@ namespace tvpgo
         {
             Parser.Default.ParseArguments<Options>(args).WithParsedAsync(async o =>
             {
-                var station = (await GetStations()).SingleOrDefault(x => x.Code.Equals(o.StationCode));
+                var station = (await GetStations()).SingleOrDefault(x => x.Code.Equals(o.StationCode, StringComparison.InvariantCultureIgnoreCase));
                 if (!o.Epg)
                 {
+                    string url;
                     ProgramDetails program;
-                    if (!string.IsNullOrEmpty(o.ReocordId))
+                    EpgShow show =  new EpgShow();
+                    if (string.IsNullOrEmpty(o.ReocordId))
                     {
                         program = await GetProgram(station);
                     }else{
                         var epg = await GetEpg(station);
-                        var show = epg.data.SingleOrDefault(x=> x.record_id.Equals(o.ReocordId));
+                        show = epg.data.SingleOrDefault(x=> x.record_id.Equals(o.ReocordId));
                         program = await GetProgram(station, show);
                     }
                     var token = await GetToken(program.stream_url);
@@ -50,7 +55,13 @@ namespace tvpgo
                             break;
                         }
                     }
-                    System.Console.WriteLine(format.url);
+                    url = format.url;
+                    if (o.Play)
+                    {
+                        Play(show, format);
+                    }else{
+                        System.Console.WriteLine(format.url);
+                    }
                 }
                 else
                 {
@@ -64,8 +75,6 @@ namespace tvpgo
                 string stations = await ListStations();
                 System.Console.WriteLine(stations);
             });
-            // HttpWebRequest request = WebRequest.Create(STATIONS_URL) as HttpWebRequest;  
-
         }
         public static async Task<string> ListStations()
         {
@@ -127,19 +136,33 @@ namespace tvpgo
 
         public static async Task<string> ListEpg(Epg epg)
         {
-            var ordered = epg.data.OrderBy(x => x.date_start);
-            StringBuilder sb = new StringBuilder();
-            foreach (var show in ordered)
-            {
-                sb.AppendLine($"{show.record_id}\t{show.title}\tj{show.date_start}");
-            }
-            return sb.ToString();
+            //var ordered = epg.data.OrderBy(x => x.date_start).Select(x=> new{ID = x.record_id, Title = x.title, StartTime = UnixTimeStampToDateTime(x.date_start)});
+            var ordered = epg.data.OrderBy(x => x.date_start).Select(x=> Tuple.Create(x.record_id, x.title, UnixTimeStampToDateTime(x.date_start).ToString()));
+            // StringBuilder sb = new StringBuilder();
+            // foreach (var show in ordered)
+            // {
+            //     sb.AppendLine($"{show.record_id}\t{show.title}\t{UnixTimeStampToDateTime(show.date_start)}");
+            // }
+            // return sb.ToString();
+            return ordered.ToStringTable(new[] {"Id", "Title", "Start Time"}, x=> x.Item1, x=>x.Item2, x=>x.Item3);
         }
         public static DateTime UnixTimeStampToDateTime(long unixTimeStamp)
         {
             DateTime dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
-            dateTime = dateTime.AddSeconds(unixTimeStamp).ToLocalTime();
+            dateTime = dateTime.AddMilliseconds(unixTimeStamp).ToLocalTime();
             return dateTime;
+        }
+        public static void Play(EpgShow show, Format format)
+        {
+            List<string> args = new List<string>();
+            args.Add(format.url);
+            args.Add("-title");
+            args.Add($"\"{show.title}\"");
+            ProcessStartInfo startInfo = new ProcessStartInfo(){
+                FileName = "mpv",
+                Arguments = string.Join(' ', args)
+            };
+            Process.Start(startInfo);
         }
     }
     internal class Station
