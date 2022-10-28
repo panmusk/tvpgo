@@ -27,26 +27,26 @@ namespace tvpgo
         public static readonly string EPG_URL = "https://tvpstream.tvp.pl/api/tvp-stream/program-tv/index?station_code={0}";
         public static readonly string REPLAY_URL = "https://tvpstream.tvp.pl/api/tvp-stream/stream/data?station_code={0}&record_id={1}";
         public static readonly long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        public static readonly Color HIGHLIGHT_CLOR = Color.Blue;
         private static async Task Main(string[] args)
         {
             var channels = await GetChannels();
             var channel = await GetChannel(channels);
             var epg = await GetEpg(channel);
-            var show = epg.data.OrderBy(x=>x.date_start).Where(x=> x.date_end >= now).First();
-            var live = await GetLive(show);
+            var currentShow = epg.data.OrderBy(x=>x.date_start).Where(x=> x.date_end >= now).First();
+            var live = await GetLive(currentShow);
+            Format format = new Format();
+            ProgramDetails program = new ProgramDetails();
             if (live)
             {
-                var program = await GetProgram(channel);
-                var token = await GetToken(program.stream_url);
-                var format = GetFormat(token);
-                Play(show, format);
+                program = await GetProgram(channel);
             }else{
-                show = await GetShow(epg);
-                var program = await GetProgram(channel, show);
-                var token = await GetToken(program.stream_url);
-                Format format = GetFormat(token);
-                Play(show, format);
+                currentShow = await GetShow(epg);
+                program = await GetProgram(channel, currentShow);
             }
+                var token = await GetToken(program.stream_url);
+                format = GetFormat(token);
+                Play(currentShow, format);
         }
 
         private static Format GetFormat(Tokenizer token)
@@ -112,14 +112,15 @@ namespace tvpgo
 
         public static async Task<EpgShow> GetShow(Epg epg)
         {
-            var ordered = epg.data.Where(x=> x.date_start < now).OrderBy(x => x.date_start).Select(x=> Tuple.Create(x.record_id, x.title, UnixTimeStampToDateTime(x.date_start).ToString()));
+            var ordered = epg.data.Where(x=> x.date_start < now && x.duration > 0).OrderBy(x => x.date_start).Select(x=> Tuple.Create(x.record_id, x.title, UnixTimeStampToDateTime(x.date_start).ToString()));
             var programs = AnsiConsole.Prompt(
                 new SelectionPrompt<Tuple<string, string, string>>()
                 .PageSize(20)
-                .Title("Choose program")
+                .Title("Choose show")
                 .AddChoices(
                     ordered
                 )
+                .HighlightStyle(Style.WithBackground(HIGHLIGHT_CLOR))
             );
             var show = epg.data.SingleOrDefault(x=> x.record_id.Equals(programs.Item1));
             return show;
@@ -134,7 +135,7 @@ namespace tvpgo
                 .AddChoices(
                     stationList
                 )
-                .HighlightStyle(Style.WithBackground(Color.Aqua))
+                .HighlightStyle(Style.WithBackground(HIGHLIGHT_CLOR))
             );
             var channel = stations.SingleOrDefault(x=> x.Code.Equals(programs.Item2));
             return channel;
@@ -144,12 +145,12 @@ namespace tvpgo
             var live = AnsiConsole.Prompt(
                 new SelectionPrompt<Tuple<string, bool>>()
                 .PageSize(20)
-                .Title("Choose channel")
+                .Title("Play live or replay a show?")
                 .AddChoices(
-                    Tuple.Create($"Play live stream ({show.title})", true),
-                    Tuple.Create("Select program to play", false)
+                    Tuple.Create($"Play channel live ({show.title})", true),
+                    Tuple.Create("Choose show to replay", false)
                 )
-                .HighlightStyle(Style.WithBackground(Color.Aqua))
+                .HighlightStyle(Style.WithBackground(HIGHLIGHT_CLOR))
             );
             return live.Item2;
         }
@@ -164,7 +165,7 @@ namespace tvpgo
             List<string> args = new List<string>();
             args.Add(format.url);
             args.Add("-title");
-            args.Add($"\"{show.title}\"");
+            args.Add($"\"[{show.station.name}] - {show.title}\"");
             ProcessStartInfo startInfo = new ProcessStartInfo(){
                 FileName = "mpv",
                 Arguments = string.Join(' ', args)
