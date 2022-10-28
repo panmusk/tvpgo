@@ -1,6 +1,6 @@
 namespace tvpgo.Json
 {
-    public class Stations
+    public class Channels
 {
     public object error { get; set; }
     public Datum[] data { get; set; }

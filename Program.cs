@@ -1,20 +1,20 @@
-﻿using System.Diagnostics;
+﻿using System.Linq;
+using System;
+using System.Diagnostics;
 using System.Text;
 using Newtonsoft.Json;
 using CommandLine;
 using tvpgo.Json;
-
+using Spectre.Console;
 namespace tvpgo
 {
     public class Options
     {
-        [Option('s', "station", Required = true, HelpText = "three-letter station, code, possible station codes")]
+        [Option('s', "station", HelpText = "three-letter station, code, possible station codes")]
         public string StationCode { get; set; }
         [Option('b', "begin", Required = false)]
         public string Begin { get; set; }
 
-        [Option('e', Required = false)]
-        public bool Epg { get; set; }
         [Option('r', Required = false)]
         public string ReocordId { get; set; }
         [Option('p', Required = false)]
@@ -26,78 +26,54 @@ namespace tvpgo
         public static readonly string PROGRAM_URL = "https://tvpstream.tvp.pl/api/tvp-stream/stream/data?station_code={0}";
         public static readonly string EPG_URL = "https://tvpstream.tvp.pl/api/tvp-stream/program-tv/index?station_code={0}";
         public static readonly string REPLAY_URL = "https://tvpstream.tvp.pl/api/tvp-stream/stream/data?station_code={0}&record_id={1}";
+        public static readonly long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         private static async Task Main(string[] args)
         {
-            Parser.Default.ParseArguments<Options>(args).WithParsedAsync(async o =>
+            var channels = await GetChannels();
+            var channel = await GetChannel(channels);
+            var epg = await GetEpg(channel);
+            var show = epg.data.OrderBy(x=>x.date_start).Where(x=> x.date_end >= now).First();
+            var live = await GetLive(show);
+            if (live)
             {
-                var station = (await GetStations()).SingleOrDefault(x => x.Code.Equals(o.StationCode, StringComparison.InvariantCultureIgnoreCase));
-                if (!o.Epg)
-                {
-                    string url;
-                    ProgramDetails program;
-                    EpgShow show =  new EpgShow();
-                    if (string.IsNullOrEmpty(o.ReocordId))
-                    {
-                        program = await GetProgram(station);
-                    }else{
-                        var epg = await GetEpg(station);
-                        show = epg.data.SingleOrDefault(x=> x.record_id.Equals(o.ReocordId));
-                        program = await GetProgram(station, show);
-                    }
-                    var token = await GetToken(program.stream_url);
-                    var formats = token.formats;
-                    Format format = new Format();
-                    foreach (var f in formats)
-                    {
-                        if (f.mimeType.Equals("application/x-mpegurl"))
-                        {
-                            format = f;
-                            break;
-                        }
-                    }
-                    url = format.url;
-                    if (o.Play)
-                    {
-                        Play(show, format);
-                    }else{
-                        System.Console.WriteLine(format.url);
-                    }
-                }
-                else
-                {
-                    var epg = await GetEpg(station);
-                    var epglist = await ListEpg(epg);
-                    System.Console.WriteLine(epglist);
-                }
-            });
-            Parser.Default.ParseArguments<Options>(args).WithNotParsedAsync(async o =>
-            {
-                string stations = await ListStations();
-                System.Console.WriteLine(stations);
-            });
-        }
-        public static async Task<string> ListStations()
-        {
-            var stations = await GetStations();
-            StringBuilder sb = new StringBuilder();
-            foreach (var station in stations)
-            {
-                sb.AppendLine($"{station.Code}\t{station.Name}");
+                var program = await GetProgram(channel);
+                var token = await GetToken(program.stream_url);
+                var format = GetFormat(token);
+                Play(show, format);
+            }else{
+                show = await GetShow(epg);
+                var program = await GetProgram(channel, show);
+                var token = await GetToken(program.stream_url);
+                Format format = GetFormat(token);
+                Play(show, format);
             }
-            return sb.ToString();
         }
 
-        private static async Task<IEnumerable<Station>> GetStations()
+        private static Format GetFormat(Tokenizer token)
+        {
+            Format format = new Format();
+            foreach (var f in token.formats)
+            {
+                if (f.mimeType.Equals("application/x-mpegurl"))
+                {
+                    format = f;
+                    break;
+                }
+            }
+            return format;
+        }
+
+        private static async Task<IEnumerable<Channel>> GetChannels()
         {
             HttpClient client = new HttpClient();
             HttpRequestMessage m = new HttpRequestMessage(HttpMethod.Get, STATIONS_URL);
             var r = client.Send(m);
             string json = await r.Content.ReadAsStringAsync();
-            var stations = JsonConvert.DeserializeObject<Stations>(json);
-            IEnumerable<Station> Stations = stations.data.Select(x => new Station { Code = x.code, Name = x.name });
+            var stations = JsonConvert.DeserializeObject<Channels>(json);
+            IEnumerable<Channel> Stations = stations.data.Select(x => new Channel { Code = x.code, Name = x.name });
             return Stations;
         }
-        private static async Task<ProgramDetails> GetProgram(Station station)
+        private static async Task<ProgramDetails> GetProgram(Channel station)
         {
             HttpClient client = new HttpClient();
             HttpRequestMessage m = new HttpRequestMessage(HttpMethod.Get, string.Format(PROGRAM_URL, station.Code));
@@ -106,7 +82,7 @@ namespace tvpgo
             var program = JsonConvert.DeserializeObject<ProgramData>(json);
             return program.data;
         }
-        private static async Task<ProgramDetails> GetProgram(Station station, EpgShow show)
+        private static async Task<ProgramDetails> GetProgram(Channel station, EpgShow show)
         {
             HttpClient client = new HttpClient();
             HttpRequestMessage m = new HttpRequestMessage(HttpMethod.Get, string.Format(REPLAY_URL, station.Code, show.record_id));
@@ -124,7 +100,7 @@ namespace tvpgo
             var token = JsonConvert.DeserializeObject<Tokenizer>(json);
             return token;
         }
-        private static async Task<Epg> GetEpg(Station station)
+        private static async Task<Epg> GetEpg(Channel station)
         {
             HttpClient client = new HttpClient();
             HttpRequestMessage m = new HttpRequestMessage(HttpMethod.Get, string.Format(EPG_URL, station.Code));
@@ -134,17 +110,48 @@ namespace tvpgo
             return epg;
         }
 
-        public static async Task<string> ListEpg(Epg epg)
+        public static async Task<EpgShow> GetShow(Epg epg)
         {
-            //var ordered = epg.data.OrderBy(x => x.date_start).Select(x=> new{ID = x.record_id, Title = x.title, StartTime = UnixTimeStampToDateTime(x.date_start)});
-            var ordered = epg.data.OrderBy(x => x.date_start).Select(x=> Tuple.Create(x.record_id, x.title, UnixTimeStampToDateTime(x.date_start).ToString()));
-            // StringBuilder sb = new StringBuilder();
-            // foreach (var show in ordered)
-            // {
-            //     sb.AppendLine($"{show.record_id}\t{show.title}\t{UnixTimeStampToDateTime(show.date_start)}");
-            // }
-            // return sb.ToString();
-            return ordered.ToStringTable(new[] {"Id", "Title", "Start Time"}, x=> x.Item1, x=>x.Item2, x=>x.Item3);
+            var ordered = epg.data.Where(x=> x.date_start < now).OrderBy(x => x.date_start).Select(x=> Tuple.Create(x.record_id, x.title, UnixTimeStampToDateTime(x.date_start).ToString()));
+            var programs = AnsiConsole.Prompt(
+                new SelectionPrompt<Tuple<string, string, string>>()
+                .PageSize(20)
+                .Title("Choose program")
+                .AddChoices(
+                    ordered
+                )
+            );
+            var show = epg.data.SingleOrDefault(x=> x.record_id.Equals(programs.Item1));
+            return show;
+        }
+        public static async Task<Channel> GetChannel(IEnumerable<Channel> stations)
+        {
+            var stationList = stations.Select(x=> Tuple.Create(x.Name, x.Code));
+            var programs = AnsiConsole.Prompt(
+                new SelectionPrompt<Tuple<string, string>>()
+                .PageSize(20)
+                .Title("Choose channel")
+                .AddChoices(
+                    stationList
+                )
+                .HighlightStyle(Style.WithBackground(Color.Aqua))
+            );
+            var channel = stations.SingleOrDefault(x=> x.Code.Equals(programs.Item2));
+            return channel;
+        }
+        public static async Task<bool> GetLive(EpgShow show)
+        {
+            var live = AnsiConsole.Prompt(
+                new SelectionPrompt<Tuple<string, bool>>()
+                .PageSize(20)
+                .Title("Choose channel")
+                .AddChoices(
+                    Tuple.Create($"Play live stream ({show.title})", true),
+                    Tuple.Create("Select program to play", false)
+                )
+                .HighlightStyle(Style.WithBackground(Color.Aqua))
+            );
+            return live.Item2;
         }
         public static DateTime UnixTimeStampToDateTime(long unixTimeStamp)
         {
@@ -165,7 +172,7 @@ namespace tvpgo
             Process.Start(startInfo);
         }
     }
-    internal class Station
+    internal class Channel
     {
         public string Code { get; set; }
         public string Name { get; set; }
