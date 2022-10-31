@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+
 namespace tvpgo.Json
 {
     public class ProgramData
