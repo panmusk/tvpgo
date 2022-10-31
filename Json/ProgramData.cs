@@ -1,11 +1,23 @@
+using Newtonsoft.Json;
+
 namespace tvpgo.Json
 {
     public class ProgramData
     {
+        private static readonly string PROGRAM_URL = "https://tvpstream.tvp.pl/api/tvp-stream/stream/data?station_code={0}";
+        private static readonly string REPLAY_URL = "https://tvpstream.tvp.pl/api/tvp-stream/stream/data?station_code={0}&record_id={1}";
         public object error { get; set; }
         public ProgramDetails data { get; set; }
+        public static async Task<ProgramDetails> Create(Station station, EpgShow show = null)
+        {
+            HttpClient client = new HttpClient();
+            HttpRequestMessage m = show == null ? new HttpRequestMessage(HttpMethod.Get, string.Format(PROGRAM_URL, station.code)) : new HttpRequestMessage(HttpMethod.Get, string.Format(REPLAY_URL, station.code, show.record_id));
+            var r = client.Send(m);
+            string json = await r.Content.ReadAsStringAsync();
+            var program = JsonConvert.DeserializeObject<ProgramData>(json);
+            return program.data;
+        }
     }
-
     public class ProgramDetails
     {
         public string type { get; set; }
