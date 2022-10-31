@@ -5,11 +5,15 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <FileVersion>1.2.0</FileVersion>
+    <Version>1.2.0</Version>
+    <Description>Console tvpgo client</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="SmartFormat" Version="3.2.0" />
     <PackageReference Include="Spectre.Console" Version="0.45.0" />
   </ItemGroup>
 
