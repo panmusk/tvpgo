@@ -9,7 +9,7 @@ namespace tvpgo.Json
         {
             return await StaticTools.WebDeserializeAsync<Stations>(STATIONS_URL);
         }
-        public object error { get; set; }
+        public Error error { get; set; }
         public Station[] data { get; set; }
     }
     public class Station

@@ -25,22 +25,47 @@ namespace tvpgo
                     var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                     var channels = (await Stations.Create()).data;
                     var channel = await Prompts.ChooseChannel(channels);
-                    var epg = await Epg.Create(channel);
-                    var currentShow = epg.data.OrderBy(x => x.date_start).Where(x => x.date_end >= now).First();
-                    var playLive = await Prompts.ChooseLive(currentShow);
                     ProgramDetails program = new ProgramDetails();
-                    if (playLive)
+                    EpgShow show = new EpgShow();
+                    //TODO get rid of this nasty ifology
+                    if (channel.code.Equals(StaticTools.SearchCode))
                     {
-                        program = await ProgramData.Create(channel);
+                        var searchTerm = Prompts.AskSearch();
+                        SearchScope scope = await Prompts.ChooseScope();
+                        var searchResults = await SearchResults.Create(searchTerm, scope);
+                        if (searchResults.data.occurrenceitem.Length == 0)
+                        {
+                            Prompts.WriteLine($"No results for search [red]{searchTerm}[/]");
+                            Thread.Sleep(1000);
+                            continue;
+                        }
+                        show = await Prompts.ChooseFromSearchResult(searchResults.data.occurrenceitem);
+                        program = await ProgramData.Create(show);
                     }
                     else
                     {
-                        currentShow = await Prompts.ChooseShow(epg);
-                        program = await ProgramData.Create(channel, currentShow);
+                        var epg = await Epg.Create(channel);
+                        show = epg.data.OrderBy(x => x.date_start).Where(x => x.date_end >= now).First();
+                        var playLive = await Prompts.ChooseLive(show);
+                        if (playLive)
+                        {
+                            program = await ProgramData.Create(channel);
+                        }
+                        else
+                        {
+                            show = await Prompts.ChooseShow(epg);
+                            program = await ProgramData.Create(channel, show);
+                        }
+                    }
+                    if (program.stream_url == null)
+                    {
+                        Prompts.WriteLine("not playable");
+                        Thread.Sleep(1000);
+                        continue;
                     }
                     var token = await Tokenizer.Create(program.stream_url);
                     var format = token.defaultFormat;
-                    Play(currentShow, format);
+                    Play(show, format);
                 }
             });
         }
@@ -49,7 +74,12 @@ namespace tvpgo
             List<string> args = new List<string>();
             args.Add(format.url);
             args.Add("-title");
-            args.Add($"\"[{show.station.name}] - {show.title}\"");
+            var stationName = string.Empty;
+            if (show.station != null)
+            {
+                stationName = show.station.name;
+            }
+            args.Add($"\"[{stationName}] - {show.title}\"");
             if (options.Record)
             {
                 args.Add("-o");

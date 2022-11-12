@@ -27,5 +27,9 @@ namespace tvpgo
             var stations = JsonConvert.DeserializeObject<T>(json);
             return stations;
         }
+        public const string SearchCode = "searchCode";
+        public const string PreviousDateId = "previousDate";
+        public const string NextDateId = "nextDate";
+        public const string NextPageId = "nextPageID";
     }
 }

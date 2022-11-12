@@ -11,7 +11,7 @@ namespace tvpgo.Json
             return epg;
         }
 
-        public object error { get; set; }
+        public Error error { get; set; }
         public EpgShow[] data { get; set; }
 
     }
@@ -32,10 +32,16 @@ namespace tvpgo.Json
         public Program program { get; set; }
         public Station station { get; set; }
         public Category[] categories { get; set; }
+        public int? plrating { get; set; }
         public string[] akpa_attributes { get; set; }
         public object tabs { get; set; }
         public string id_szarp_aud { get; set; }
         public int? vortal_id { get; set; }
+        public bool violence_check { get; set; }
+        public bool sex_check { get; set; }
+        public bool profanity_check { get; set; }
+        public bool drugs_check { get; set; }
+        public float _score { get; set; }
     }
 
     public class Program
