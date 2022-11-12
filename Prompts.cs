@@ -100,22 +100,15 @@ namespace tvpgo
                 .AddChoices(
                     Occurrenceitems
                 )
-                .AddChoices(
-                    new EpgShow(){id = StaticTools.NextPageId}
-                )
                 .UseConverter(x =>
                 {
                     var disabled = x.akpa_attributes.Contains("catchUpDisabled");
                     var color = disabled ? "red" : "default";
-                    return $"[{color}]{x.program.title}[/]";
+                    var title = StaticTools.Coalesce(new string[]{x.program.title, x.subtitle, x.title});
+                    return $"[{color}]{title}[/]";
                 })
                 .HighlightStyle(Style.WithBackground(HIGHLIGHT_CLOR))
             );
-            if (occurrenceitem.id.Equals(StaticTools.NextPageId))
-            {
-                //TODO
-                throw new NotImplementedException();
-            }
             return occurrenceitem;
         }
 

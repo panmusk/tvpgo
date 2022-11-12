@@ -33,7 +33,7 @@ namespace tvpgo
                         var searchTerm = Prompts.AskSearch();
                         SearchScope scope = await Prompts.ChooseScope();
                         var searchResults = await SearchResults.Create(searchTerm, scope);
-                        if (searchResults.data.occurrenceitem.Length == 0)
+                        if (searchResults.data == null && searchResults.data.occurrenceitem.Length == 0)
                         {
                             Prompts.WriteLine($"No results for search [red]{searchTerm}[/]");
                             Thread.Sleep(1000);
@@ -93,9 +93,21 @@ namespace tvpgo
             {
                 FileName = "mpv",
                 Arguments = string.Join(' ', args),
-                UseShellExecute = options.Record
+                UseShellExecute = options.Record,
             };
-            Process.Start(startInfo);
+            var process = Process.Start(startInfo);
+            process.EnableRaisingEvents = true;
+            process.Exited += new EventHandler(ProcessExited);
+        }
+
+        private static void ProcessExited(object? sender, EventArgs e)
+        {
+            if (sender is Process && ((Process)sender).ExitCode != 0)
+            {
+                var exitCode = ((Process)sender).ExitCode;
+                Prompts.WriteLine($"[red]mpv exited with exit code [/][blue]{exitCode}[/]");
+                Thread.Sleep(1000);
+            }
         }
     }
 }

@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 
 namespace tvpgo.Json
@@ -15,9 +17,13 @@ namespace tvpgo.Json
             var programDetails = await StaticTools.WebDeserializeAsync<ProgramData>(url);
             return programDetails.data;
         }
-        public static async Task<ProgramDetails> Create(EpgShow occurrenceitem)
+        public static async Task<ProgramDetails> Create(EpgShow show)
         {
-            var url = string.Format(OCCURRENCE_URL, occurrenceitem.id);
+            if (!new Regex("^[0-9]+$").IsMatch(show.id))
+            {
+                return await Create(show.station, show);
+            }
+            var url = string.Format(OCCURRENCE_URL, show.id);
             var programDetails = await StaticTools.WebDeserializeAsync<ProgramData>(url);
             return programDetails.data;
         }

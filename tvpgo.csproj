@@ -5,8 +5,8 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <FileVersion>1.2.0</FileVersion>
-    <Version>1.2.0</Version>
+    <FileVersion>1.3.0</FileVersion>
+    <Version>1.3.0</Version>
     <Description>Console tvpgo client</Description>
   </PropertyGroup>
 

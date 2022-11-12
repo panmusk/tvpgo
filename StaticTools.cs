@@ -27,6 +27,8 @@ namespace tvpgo
             var stations = JsonConvert.DeserializeObject<T>(json);
             return stations;
         }
+        public static string Coalesce(IEnumerable<string> strings) => strings.FirstOrDefault(s => !string.IsNullOrEmpty(s));
+
         public const string SearchCode = "searchCode";
         public const string PreviousDateId = "previousDate";
         public const string NextDateId = "nextDate";

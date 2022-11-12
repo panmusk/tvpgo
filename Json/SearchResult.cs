@@ -5,7 +5,7 @@ namespace tvpgo.Json
 
     public class SearchResults
     {
-        private static readonly string SEARCH_URL = "https://tvpstream.tvp.pl/api/tvp-stream/search?query={0}&scope={1}&limit=20&page={2}";
+        private static readonly string SEARCH_URL = "https://tvpstream.tvp.pl/api/tvp-stream/search?query={0}&scope={1}&limit=40&page={2}";
         public Error? error { get; set; }
         public Data data { get; set; }
         public static async Task<SearchResults> Create(string query, SearchScope scope, int page=1)
