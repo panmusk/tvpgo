@@ -79,5 +79,4 @@ namespace tvpgo.Json
         public string category_type { get; set; }
         public string title { get; set; }
     }
-
 }

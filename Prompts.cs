@@ -132,5 +132,20 @@ namespace tvpgo
         );
             return scope;
         }
+
+        internal static async Task<Format> ChooseFormat(Tokenizer token)
+        {
+            var format = AnsiConsole.Prompt(
+            new SelectionPrompt<Format>()
+            .PageSize(20)
+            .Title("Choose format")
+            .AddChoices(
+                token.formats.OrderBy(x=> x.totalBitrate)
+            )
+            .UseConverter(x => $"bitrate: {x.totalBitrate} - {x.mimeType}")
+            .HighlightStyle(Style.WithBackground(HIGHLIGHT_CLOR))
+        );
+            return format;
+        }
     }
 }

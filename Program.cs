@@ -64,11 +64,44 @@ namespace tvpgo
                         continue;
                     }
                     var token = await Tokenizer.Create(program.stream_url);
-                    var format = token.defaultFormat;
-                    Play(show, format);
+                    Format format;
+                    if (options.Record)
+                    {
+                        format = await Prompts.ChooseFormat(token);
+                    }
+                    else
+                    {
+                        format = token.defaultFormat;
+                    }
+                    if (options.Record && format.mimeType.Equals("video/mp4"))
+                    {
+                        Download(show, format);
+                    }
+                    else
+                    {
+                        Play(show, format);
+                    }
                 }
             });
         }
+
+        private static void Download(EpgShow show, Format format)
+        {
+            List<string> args = new List<string>();
+            args.Add(format.url);
+            args.Add("-O");
+            var fileExtension = Path.GetExtension(format.url);
+            args.Add($"\"{StaticTools.NormalizeFileName(show.title)}.{fileExtension}\"");
+            ProcessStartInfo startInfo = new ProcessStartInfo()
+            {
+                FileName = "wget",
+                Arguments = string.Join(' ', args),
+                UseShellExecute = options.Record,
+            };
+            var process = Process.Start(startInfo);
+            process.Exited += new EventHandler(ProcessExited);
+        }
+
         public static void Play(EpgShow show, Format format)
         {
             List<string> args = new List<string>();
@@ -105,7 +138,8 @@ namespace tvpgo
             if (sender is Process && ((Process)sender).ExitCode != 0)
             {
                 var exitCode = ((Process)sender).ExitCode;
-                Prompts.WriteLine($"[red]mpv exited with exit code [/][blue]{exitCode}[/]");
+                var processName = ((Process)sender).ProcessName;
+                Prompts.WriteLine($"[red]{processName} exited with code [/][blue]{exitCode}[/]");
                 Thread.Sleep(1000);
             }
         }
